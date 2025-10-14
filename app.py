@@ -660,7 +660,6 @@ Missing = NotFound
 """
 
 Missing = NotFound
-"""
 
 # --------------------------------------------------------------
 # ASYNC API CALL
@@ -798,6 +797,7 @@ with tab2:
             st.dataframe(df_past, use_container_width=True)
         else:
             st.error("❌ No records found for this address.")
+
 
 
 
