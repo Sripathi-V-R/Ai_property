@@ -1,0 +1,40 @@
+# ============================
+# Git Ignore for Streamlit AI Property App
+# Author: Ai Master
+# ============================
+
+# Environment & Config
+.env
+*.env
+secrets.toml
+
+# Streamlit Cache
+.streamlit/
+__pycache__/
+*/__pycache__/
+
+# Python Files
+*.pyc
+*.pyo
+*.pyd
+*.log
+
+# IDE & Editor Settings
+.vscode/
+.idea/
+.DS_Store
+
+# Temporary or Output Files
+*.xlsx
+*.csv
+*.zip
+*.tmp
+*.bak
+
+# Bytecode and virtual environments
+*.egg-info/
+*.egg
+build/
+dist/
+venv/
+.env/
