@@ -252,11 +252,11 @@ def build_prompt(address, field_list, section_name, county_name, county_url):
     return f"""
 You are a verified property data retriever.
 Fetch the accurate value for each field below for the property: {address}
-
+ important : accurate result has to be provided. check any sources you needed. 
 Fields:
 {field_defs}
 
-Use trusted sources: Zillow, Redfin, County Assessor, Realtor, official data.
+
 {county_info}
 
 Return strictly in markdown table:
@@ -401,6 +401,7 @@ with tab2:
             st.dataframe(df_past, use_container_width=True)
         else:
             st.error("❌ No records found for this address.")
+
 
 
 
