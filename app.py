@@ -163,12 +163,16 @@ def detect_county_and_state(address):
 def parse_table(raw_output):
     records = []
     for line in raw_output.split("\n"):
-        if "|" in line and not re.search(r"Field\s*\|\s*Value\s*\|\s*Source|----", line, re.IGNORECASE):
+        if "|" in line and not re.search(r"Field\s*\|\s*Value", line, re.IGNORECASE):
             parts = [p.strip() for p in line.split("|") if p.strip()]
-            if len(parts) == 3:
+            if len(parts) >= 4:
+                field, value, conf, source = parts[:4]
+                records.append({"Field": field, "Value": value, "Confidence": conf, "Source": source})
+            elif len(parts) == 3:
                 field, value, source = parts
-                records.append({"Field": field, "Value": value, "Source": source})
+                records.append({"Field": field, "Value": value, "Confidence": "Medium", "Source": source})
     return records
+
 
 # --------------------------------------------------------------
 # GPT-5 ACCURATE PROMPT BUILDER
@@ -178,34 +182,46 @@ def build_prompt(address, field_list, section_name, county_name, county_url):
     county_info = f"\nOfficial county reference: {county_name} ({county_url})" if county_url else ""
 
     return f"""
-You are **ReValix AI**, an expert real estate intelligence agent.
-Your task is to fetch **only accurate, verified property data** for the following address.
+You are **ReValix AI**, a professional property data intelligence system.
 
-🏠 **Address:** {address}
+🎯 **Objective:** Retrieve accurate, realistic property information for:
+**{address}**
+
 📘 **Section:** {section_name}
 
 ---
-### Rules for GPT-5:
-1. Search verified data sources (Zillow, Redfin, Realtor, LoopNet, County GIS, FEMA, OSM).
-2. **Do not estimate or guess.** Provide only confirmed facts.
-3. Every value must include a **verified source name or domain**.
-4. If the value cannot be found → return `NotFound`.
-5. Prefer assessor and GIS data when available.
-6. Keep format strict and concise.
+### ⚙️ Rules for GPT-5
+1. Use factual sources like **Zillow**, **Redfin**, **Realtor**, **LoopNet**, **Trulia**, and **County GIS / Assessor** data.
+2. If exact data is not directly found, you may:
+   - Use cross-referenced reasoning from multiple listings or public databases.
+   - Estimate with high confidence (mark as *Estimated – High Confidence*).
+3. **Always include your confidence level**: “High”, “Medium”, or “Low”.
+4. Include **source or reasoning basis** (domain name or data type).
+5. Do not fabricate; if impossible to infer, set Value = NotFound.
+6. Return concise, structured, realistic values only.
 
-### Fields:
+---
+### 🧾 Fields to Extract
 {field_defs}
 
 {county_info}
 
 ---
-Return ONLY this table:
-| Field | Value | Source |
-|-------|--------|--------|
+### 🧱 Output format (strict)
+Return ONLY the table below:
+
+| Field | Value | Confidence | Source |
+|-------|--------|-------------|--------|
+
+- Use “High” when verified from authoritative or multiple aligned sources.
+- Use “Medium” if inferred from public listings or map data.
+- Use “Low” only for uncertain but contextually plausible data.
+- If unavailable, use `NotFound`.
 """
 
+
 # --------------------------------------------------------------
-# GPT-5 ASYNC CALL
+# GPT-5 ASYNC CALL (Balanced Mode)
 # --------------------------------------------------------------
 async def call_api_async(session, address, field_list, section_name, county, county_url):
     prompt = build_prompt(address, field_list, section_name, county, county_url)
@@ -213,21 +229,29 @@ async def call_api_async(session, address, field_list, section_name, county, cou
     payload = {
         "model": "gpt-5",
         "messages": [
-            {"role": "system", "content": "You are ReValix AI — a verified real estate data retriever using trusted sources only."},
-            {"role": "user", "content": prompt},
+            {
+                "role": "system",
+                "content": (
+                    "You are ReValix AI — an expert in property and real estate data intelligence. "
+                    "You reason accurately using cross-verified public data sources, "
+                    "and label confidence clearly."
+                )
+            },
+            {"role": "user", "content": prompt}
         ],
-        "temperature": 0.0,
-        "max_tokens": 1500
+        "temperature": 0.2,
+        "max_tokens": 2000
     }
 
     try:
-        async with session.post("https://api.openai.com/v1/chat/completions", json=payload, headers=headers, timeout=120) as resp:
+        async with session.post("https://api.openai.com/v1/chat/completions",
+                                json=payload, headers=headers, timeout=120) as resp:
             data = await resp.json()
-            return data.get("choices", [{}])[0].get("message", {}).get("content", "")
+            content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
+            return content.strip()
     except Exception as e:
         print(f"API call error for {section_name}: {e}")
         return ""
-
 # --------------------------------------------------------------
 # MERGE + SAVE
 # --------------------------------------------------------------
@@ -343,3 +367,4 @@ with tab2:
             st.dataframe(df_past, use_container_width=True)
         else:
             st.error("❌ No records found for this address.")
+
