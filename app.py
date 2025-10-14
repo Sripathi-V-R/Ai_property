@@ -414,7 +414,10 @@ def get_field_sections(df_fields):
         # 1️⃣ Identification & Basic Property Info
         # ----------------------------------------------------------
         "Identification": [
-            "Property ID", "External Reference ID", "Property Name",
+            "Property ID", "External Reference ID"
+        ],
+        
+        "Basic Property Info" :  [ "Property Name",
             "Property Type", "Property Subtype", "Ownership Type",
             "Occupancy Status", "Registration Status", "Registry Reference",
             "Building Code / Permit ID", "Geo ID"
@@ -790,3 +793,4 @@ with tab2:
             st.dataframe(df_past, use_container_width=True)
         else:
             st.error("❌ No records found for this address.")
+
