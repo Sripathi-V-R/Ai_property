@@ -1,6 +1,6 @@
 # ==============================================================
 #  🏙️ ReValix AI Property Intelligence
-#  (GPT-5 Accurate Mode + Async Fetch + MongoDB Storage)
+#  (GPT-5 Smart Accuracy Mode + Async Fetch + MongoDB Storage)
 #  Author: Ai Master | Powered by GPT-5
 # ==============================================================
 
@@ -34,46 +34,46 @@ db = mongo_client["revalix_property_intelligence"]
 collection = db["property_results"]
 
 # --------------------------------------------------------------
-# STREAMLIT CONFIG + MODERN GLASS THEME
+# STREAMLIT CONFIG + THEME
 # --------------------------------------------------------------
 st.set_page_config(page_title="ReValix AI Property Intelligence", layout="wide")
 
 st.markdown("""
-    <style>
-    .stApp {
-        background: linear-gradient(145deg, #f8fafc, #e2ecf7);
-        color: #0f172a;
-        font-family: 'Inter', sans-serif;
-    }
-    h1, h2, h3 {
-        color: #0ea5e9 !important;
-    }
-    .block-container {
-        background: rgba(255,255,255,0.85);
-        border-radius: 16px;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.05);
-        padding: 2rem;
-        backdrop-filter: blur(10px);
-    }
-    .revalix-header {
-        font-size: 2.4rem;
-        text-align: center;
-        color: #0ea5e9;
-        font-weight: 800;
-        letter-spacing: 0.5px;
-        margin-bottom: 0;
-    }
-    .revalix-sub {
-        text-align: center;
-        font-size: 1.1rem;
-        color: #334155;
-        margin-bottom: 35px;
-    }
-    </style>
+<style>
+.stApp {
+    background: linear-gradient(145deg, #f8fafc, #e2ecf7);
+    color: #0f172a;
+    font-family: 'Inter', sans-serif;
+}
+h1, h2, h3 {
+    color: #0ea5e9 !important;
+}
+.block-container {
+    background: rgba(255,255,255,0.9);
+    border-radius: 16px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+    padding: 2rem;
+    backdrop-filter: blur(10px);
+}
+.revalix-header {
+    font-size: 2.4rem;
+    text-align: center;
+    color: #0ea5e9;
+    font-weight: 800;
+    letter-spacing: 0.5px;
+    margin-bottom: 0;
+}
+.revalix-sub {
+    text-align: center;
+    font-size: 1.1rem;
+    color: #334155;
+    margin-bottom: 35px;
+}
+</style>
 """, unsafe_allow_html=True)
 
 st.markdown("<div class='revalix-header'>🏙️ ReValix AI Property Intelligence</div>", unsafe_allow_html=True)
-st.markdown("<div class='revalix-sub'>AI-Powered Real Estate Intelligence Engine (GPT-5 Accurate Mode)</div>", unsafe_allow_html=True)
+st.markdown("<div class='revalix-sub'>GPT-5 Factual + Inference Mode — AI-Powered Real Estate Data</div>", unsafe_allow_html=True)
 
 tab1, tab2 = st.tabs(["🧠 Generate Intelligence", "📜 View Past Reports"])
 
@@ -134,14 +134,12 @@ def get_field_sections(df_fields):
         "Market & Financial": ["Current Market Value", "Appraised Value", "Purchase Price", "Purchase Date", "Property Tax", "Market Cap Rate", "Market Rent", "Vacancy Rate"],
         "AI Insights": ["AI Condition Index"]
     }
-
-    records = []
-    for section, fields in sections.items():
-        for f in fields:
-            if f in df_fields["Field"].values:
-                desc = df_fields.loc[df_fields["Field"] == f, "Description"].values[0]
-                records.append({"Section": section, "Field": f, "Description": desc})
-    return pd.DataFrame(records)
+    recs = []
+    for sec, fs in sections.items():
+        for f in fs:
+            desc = df_fields.loc[df_fields["Field"] == f, "Description"].values[0]
+            recs.append({"Section": sec, "Field": f, "Description": desc})
+    return pd.DataFrame(recs)
 
 df_sections = get_field_sections(df_fields)
 
@@ -173,55 +171,44 @@ def parse_table(raw_output):
                 records.append({"Field": field, "Value": value, "Confidence": "Medium", "Source": source})
     return records
 
-
 # --------------------------------------------------------------
-# GPT-5 ACCURATE PROMPT BUILDER
+# GPT-5 SMART PROMPT
 # --------------------------------------------------------------
 def build_prompt(address, field_list, section_name, county_name, county_url):
     field_defs = "\n".join([f"- {f}: {d}" for f, d in field_list])
     county_info = f"\nOfficial county reference: {county_name} ({county_url})" if county_url else ""
 
     return f"""
-You are **ReValix AI**, a professional property data intelligence system.
+You are **ReValix AI**, a professional property intelligence agent.
 
-🎯 **Objective:** Retrieve accurate, realistic property information for:
+🎯 **Objective:** Retrieve accurate, realistic property data for:
 **{address}**
 
 📘 **Section:** {section_name}
 
 ---
 ### ⚙️ Rules for GPT-5
-1. Use factual sources like **Zillow**, **Redfin**, **Realtor**, **LoopNet**, **Trulia**, and **County GIS / Assessor** data.
-2. If exact data is not directly found, you may:
-   - Use cross-referenced reasoning from multiple listings or public databases.
-   - Estimate with high confidence (mark as *Estimated – High Confidence*).
-3. **Always include your confidence level**: “High”, “Medium”, or “Low”.
-4. Include **source or reasoning basis** (domain name or data type).
-5. Do not fabricate; if impossible to infer, set Value = NotFound.
-6. Return concise, structured, realistic values only.
+1. Search and infer from trusted sources (Zillow, Redfin, Realtor, LoopNet, Trulia, County GIS, FEMA, OpenStreetMap).
+2. Use verified or high-confidence inferred data only.
+3. Include confidence level — High / Medium / Low.
+4. Always state your source or reasoning.
+5. If no data is available, mark Value = NotFound.
+6. Stay concise and factual — no commentary.
 
 ---
-### 🧾 Fields to Extract
+### 🧾 Fields
 {field_defs}
 
 {county_info}
 
 ---
-### 🧱 Output format (strict)
-Return ONLY the table below:
-
+Return ONLY a markdown table:
 | Field | Value | Confidence | Source |
 |-------|--------|-------------|--------|
-
-- Use “High” when verified from authoritative or multiple aligned sources.
-- Use “Medium” if inferred from public listings or map data.
-- Use “Low” only for uncertain but contextually plausible data.
-- If unavailable, use `NotFound`.
 """
 
-
 # --------------------------------------------------------------
-# GPT-5 ASYNC CALL (Balanced Mode)
+# GPT-5 ASYNC CALL
 # --------------------------------------------------------------
 async def call_api_async(session, address, field_list, section_name, county, county_url):
     prompt = build_prompt(address, field_list, section_name, county, county_url)
@@ -229,14 +216,7 @@ async def call_api_async(session, address, field_list, section_name, county, cou
     payload = {
         "model": "gpt-5",
         "messages": [
-            {
-                "role": "system",
-                "content": (
-                    "You are ReValix AI — an expert in property and real estate data intelligence. "
-                    "You reason accurately using cross-verified public data sources, "
-                    "and label confidence clearly."
-                )
-            },
+            {"role": "system", "content": "You are ReValix AI — a verified real estate data engine combining factual data and high-confidence reasoning."},
             {"role": "user", "content": prompt}
         ],
         "temperature": 0.2,
@@ -244,32 +224,30 @@ async def call_api_async(session, address, field_list, section_name, county, cou
     }
 
     try:
-        async with session.post("https://api.openai.com/v1/chat/completions",
-                                json=payload, headers=headers, timeout=120) as resp:
+        async with session.post("https://api.openai.com/v1/chat/completions", json=payload, headers=headers, timeout=120) as resp:
             data = await resp.json()
-            content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
-            return content.strip()
+            return data.get("choices", [{}])[0].get("message", {}).get("content", "")
     except Exception as e:
         print(f"API call error for {section_name}: {e}")
         return ""
+
 # --------------------------------------------------------------
 # MERGE + SAVE
 # --------------------------------------------------------------
 def merge_and_save(df_ai, df_fields, property_address):
     if df_ai.empty:
-        df_ai = pd.DataFrame(columns=["Field", "Value", "Source"])
+        df_ai = pd.DataFrame(columns=["Field", "Value", "Confidence", "Source"])
 
-    df_fields = df_fields.drop_duplicates(subset=["Field"], keep="first")
     merged = (
         df_ai.groupby("Field", as_index=False)
         .agg({
             "Value": lambda v: next((x for x in v if x and x != "NotFound"), "NotFound"),
-            "Source": lambda s: next((x for x in s if x and x != ""), "Verified Source"),
+            "Confidence": lambda c: next((x for x in c if x), "Medium"),
+            "Source": lambda s: next((x for x in s if x), "Verified Source"),
         })
     )
     df_final = pd.merge(df_fields[["Field"]], merged, on="Field", how="left")
-    df_final["Value"].fillna("NotFound", inplace=True)
-    df_final["Source"].fillna("Verified Source", inplace=True)
+    df_final.fillna({"Value": "NotFound", "Confidence": "Low", "Source": "Unknown"}, inplace=True)
 
     try:
         collection.replace_one({"address": property_address}, {"address": property_address, "records": df_final.to_dict(orient="records")}, upsert=True)
@@ -279,12 +257,12 @@ def merge_and_save(df_ai, df_fields, property_address):
     return df_final
 
 # --------------------------------------------------------------
-# FINAL RETRY FOR MISSING FIELDS
+# FINAL RETRY FOR MISSING
 # --------------------------------------------------------------
 async def run_missing_fields_retry(property_address, df_final, df_fields, county, county_url):
     missing = df_final[df_final["Value"] == "NotFound"]["Field"].tolist()
     if not missing:
-        st.info("✅ All fields successfully retrieved.")
+        st.info("✅ All fields retrieved.")
         return df_final
 
     st.warning(f"🔁 Re-fetching {len(missing)} missing fields...")
@@ -292,12 +270,7 @@ async def run_missing_fields_retry(property_address, df_final, df_fields, county
     prompt = build_prompt(property_address, missing_defs, "Final Retry", county, county_url)
 
     headers = {"Content-Type": "application/json", "Authorization": f"Bearer {OPENAI_API_KEY}"}
-    payload = {
-        "model": "gpt-5",
-        "messages": [{"role": "system", "content": "Provide verified factual property data only."},
-                     {"role": "user", "content": prompt}],
-        "temperature": 0.0,
-    }
+    payload = {"model": "gpt-5", "messages": [{"role": "user", "content": prompt}], "temperature": 0.2}
 
     async with aiohttp.ClientSession() as session:
         async with session.post("https://api.openai.com/v1/chat/completions", json=payload, headers=headers) as resp:
@@ -307,7 +280,7 @@ async def run_missing_fields_retry(property_address, df_final, df_fields, county
     new_records = parse_table(content)
     df_new = pd.DataFrame(new_records)
     for _, row in df_new.iterrows():
-        df_final.loc[df_final["Field"] == row["Field"], ["Value", "Source"]] = [row["Value"], row["Source"]]
+        df_final.loc[df_final["Field"] == row["Field"], ["Value", "Confidence", "Source"]] = [row["Value"], row["Confidence"], row["Source"]]
     st.success("✨ Missing fields refined successfully.")
     return df_final
 
@@ -322,20 +295,18 @@ with tab1:
         if not property_address.strip():
             st.warning("⚠️ Please enter a property address.")
         else:
-            with st.spinner("Detecting location and processing sections..."):
+            with st.spinner("Detecting location and generating report..."):
                 county, state = detect_county_and_state(property_address)
                 county_url = f"https://www.{county.lower().replace(' ', '')}{state.lower().replace(' ', '')}.gov" if county and state else ""
-
             st.success(f"📍 County Detected: {county}, {state}")
 
             async def process_sections():
                 async with aiohttp.ClientSession() as session:
                     tasks = []
-                    for section_name in df_sections["Section"].unique():
-                        fields = df_sections[df_sections["Section"] == section_name][["Field", "Description"]].values.tolist()
-                        tasks.append(call_api_async(session, property_address, fields, section_name, county, county_url))
-                    results = await asyncio.gather(*tasks)
-                    return results
+                    for sec in df_sections["Section"].unique():
+                        fields = df_sections[df_sections["Section"] == sec][["Field", "Description"]].values.tolist()
+                        tasks.append(call_api_async(session, property_address, fields, sec, county, county_url))
+                    return await asyncio.gather(*tasks)
 
             results = asyncio.run(process_sections())
             all_records = []
@@ -347,10 +318,10 @@ with tab1:
             df_final = asyncio.run(run_missing_fields_retry(property_address, df_final, df_fields, county, county_url))
 
             st.success(f"✅ Intelligence report for {property_address} generated successfully.")
-            st.dataframe(df_final[["Field", "Value", "Source"]], use_container_width=True)
+            st.dataframe(df_final[["Field", "Value", "Confidence", "Source"]], use_container_width=True)
 
             output = BytesIO()
-            df_final.drop(columns=["Source"]).to_excel(output, index=False)
+            df_final.to_excel(output, index=False)
             st.download_button("⬇️ Download Report (Excel)", data=output.getvalue(), file_name=f"ReValix_{property_address.replace(' ', '_')}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
 # --------------------------------------------------------------
@@ -362,9 +333,8 @@ with tab2:
     if st.button("🔍 Retrieve Report", use_container_width=True):
         doc = collection.find_one({"address": search_address})
         if doc:
-            df_past = pd.DataFrame(doc["records"])[["Field", "Value", "Source"]]
+            df_past = pd.DataFrame(doc["records"])[["Field", "Value", "Confidence", "Source"]]
             st.success(f"✅ Showing saved report for: {search_address}")
             st.dataframe(df_past, use_container_width=True)
         else:
             st.error("❌ No records found for this address.")
-
