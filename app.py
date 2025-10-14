@@ -272,7 +272,7 @@ async def call_api_async(session, address, field_list, section_name, county, cou
     prompt = build_prompt(address, field_list, section_name, county, county_url)
     headers = {"Content-Type": "application/json", "Authorization": f"Bearer {OPENAI_API_KEY}"}
     payload = {
-        "model": "gpt-4.1",
+        "model": "gpt-4.1-mini",
         "messages": [
             {"role": "system", "content": "You are a verified real estate data retriever."},
             {"role": "user", "content": prompt},
@@ -401,4 +401,5 @@ with tab2:
             st.dataframe(df_past, use_container_width=True)
         else:
             st.error("❌ No records found for this address.")
+
 
