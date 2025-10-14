@@ -1,6 +1,8 @@
 streamlit
 pandas
-python-dotenv
 openai
 pymongo
+python-dotenv
 requests
+openpyxl
+
