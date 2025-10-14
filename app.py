@@ -638,20 +638,47 @@ def build_prompt(address, field_list, section_name, county_name, county_url):
     field_defs = "\n".join([f"{f}: {d}" for f, d in field_list])
     county_info = f"\nAlso check official county site: {county_name} ({county_url})" if county_url else ""
     return f"""
-You are a professional property data intelligence engine.
-Fetch verified and factual information for this property: {address}
+You are a professional, factual Property Data Intelligence Engine.  Act like an evidence-first data extraction system.
 
-Section: {section_name}
-Fields:
+TASK
+For the property: **{address}**
+Section: **{section_name}**
+
+FIELDS
 {field_defs}
 
-Use these sources: any of the sources available on web using gpt which could provide better results 
+SOURCES (priority order — consult these first and prefer higher priority when sources conflict):
+1. County official sources (Assessor, Recorder/Clerk, Tax Office, GIS) — **always prefer** when available and authoritative.
+2. State/local government property / land registry sites.
+3. MLS, Realtor, Redfin, Zillow, ATTOM, CoreLogic, LoopNet (public pages).
+4. Major mapping sites (Google Maps / OpenStreetMap) only for coordinates/address verification.
+5. Credible third-party datasets (news, developer sites) only when primary sources lack the data.
 
+REQUIREMENTS — MANDATORY
+- Search the web and return facts **only from verifiable public/official sources**. Do **not** hallucinate or infer. If you cannot verify a field, set Value = **NotFound**.
+- For each returned row include a **Source** that is an exact URL (or `Agency Name (URL)`) pointing to the page used. **Do not** return generic source names without a URL.
+- If multiple sources disagree, **prefer county official sources** and set Source to that county URL. If county is unavailable and you choose a non-county source, include two sources separated by `; ` (first = preferred).
+- Output **only** a Markdown table with exactly the following header and one row per requested field, in the same order as given in `{field_defs}`:
 
-{county_info}
-
-Return ONLY:
 | Field | Value | Source |
+
+- **No additional text**, commentary, or explanation outside the table. If you must explain why a field is NotFound, do not — return NotFound only.
+
+FORMATTING RULES (strict)
+- Dates: **YYYY-MM-DD** (ISO). If only month/year available use `YYYY-MM-01` and mark Value exactly as `YYYY-MM-01 (month-year only)`.
+- Currency: USD, include leading `$` and commas (e.g. `$123,456`). Do not include text like "approx".
+- Areas: use `sqft` or `acres` explicitly (e.g. `2,300 sqft` or `0.23 acres`).
+- Coordinates: decimal degrees with at least 5 decimals (e.g. `40.71278, -74.00600`).
+- Numeric fields: return only numeric + unit (no extra words).
+- Text fields: short, factual phrases (no narrative).
+- If a field contains multiple discrete items (e.g., multiple owners), separate by `; `.
+
+PARSING & OUTPUT STABILITY
+- Ensure the table contains a row for **every** field requested (use `NotFound` when missing). Do not omit fields or change order.
+- Keep response succinct and strictly machine-parsable (table only).
+
+Now fetch and return the table.
+
 Missing = NotFound
 """
 
@@ -720,7 +747,7 @@ async def run_missing_fields_retry(property_address, df_final, df_fields, county
     headers = {"Content-Type": "application/json", "Authorization": f"Bearer {OPENAI_API_KEY}"}
     payload = {
         "model": "gpt-4.1-mini",
-        "messages": [{"role": "system", "content": "Fill factual property data only."}, {"role": "user", "content": prompt}],
+        "messages": [{"role": "system", "content": "Fill the actual property data only. no incorrect data"}, {"role": "user", "content": prompt}],
         "temperature": 0.0,
     }
 
@@ -791,5 +818,6 @@ with tab2:
             st.dataframe(df_past, use_container_width=True)
         else:
             st.error("❌ No records found for this address.")
+
 
 
