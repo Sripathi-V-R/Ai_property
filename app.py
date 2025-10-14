@@ -651,15 +651,15 @@ Sources:
 - Redfin
 - County Assessor
 - County Recorder
+- all well known sites
 {county_info}
 
 important note:  give proper apn , property type , property subtype , year built , lot size has to be accurate  
 Return ONLY:
 | Field | Value | Source |
-Missing = NotFound
-"""
 
 Missing = NotFound
+"""
 
 # --------------------------------------------------------------
 # ASYNC API CALL
@@ -797,6 +797,7 @@ with tab2:
             st.dataframe(df_past, use_container_width=True)
         else:
             st.error("❌ No records found for this address.")
+
 
 
 
