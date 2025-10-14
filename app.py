@@ -8,38 +8,42 @@ import streamlit as st
 import pandas as pd
 import os
 from openai import OpenAI
-from dotenv import load_dotenv
+from pymongo import MongoClient
+import requests
 import re
 from io import BytesIO
 from urllib.parse import quote_plus
-import requests
-from pymongo import MongoClient
+from dotenv import load_dotenv
 
 # --------------------------------------------------------------
-# Load Environment
+# Environment Handling (Safe for Local + Streamlit Cloud)
 # --------------------------------------------------------------
-load_dotenv()
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+# ✅ Load .env locally if available
+if os.path.exists(".env"):
+    load_dotenv()
+    OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+    MONGO_URI = os.getenv("MONGO_URI")
+else:
+    # ✅ Use Streamlit Cloud secrets
+    OPENAI_API_KEY = st.secrets["OPENAI_API_KEY"]
+    MONGO_URI = st.secrets["MONGO_URI"]
 
 # --------------------------------------------------------------
-# MongoDB Setup
+# Initialize Clients
 # --------------------------------------------------------------
-# --------------------------------------------------------------
-# MongoDB Setup
-# --------------------------------------------------------------
-MONGO_URI = os.getenv(
-    "MONGO_URI",
-    "mongodb+srv://ai_property_user:AiMaster2025@demo.md2nk8t.mongodb.net/property_intelligence?retryWrites=true&w=majority"
-)
+client = OpenAI(api_key=OPENAI_API_KEY)
 mongo_client = MongoClient(MONGO_URI)
 db = mongo_client["property_intelligence"]
 collection = db["property_results"]
+
 # --------------------------------------------------------------
-# Streamlit Setup
+# Streamlit App Config
 # --------------------------------------------------------------
 st.set_page_config(page_title="AI Property Intelligence Agent", layout="wide")
 st.title("🏠 AI Property Intelligence Agent")
 st.caption("Factual, ordered property data — auto-saved to MongoDB and retrievable anytime.")
+
 
 # --------------------------------------------------------------
 # Tabs
@@ -281,3 +285,4 @@ with tab2:
                 st.dataframe(df_past.style.applymap(highlight_cells, subset=["Value"]), use_container_width=True)
             else:
                 st.error("❌ No record found for this address in MongoDB.")
+
