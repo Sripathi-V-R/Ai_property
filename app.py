@@ -1,12 +1,14 @@
 # ==============================================================
-#  Streamlit - AI Property Intelligence Agent
-#  (MongoDB + Factual Fields + Ordered Output)
+#  🏙️ ReValix AI Property Intelligence
+#  (Async Section Calls + Smart Retry + Animated UI)
 #  Author: Ai Master | Powered by GPT-5
 # ==============================================================
 
 import streamlit as st
 import pandas as pd
 import os
+import asyncio
+import aiohttp
 from openai import OpenAI
 from pymongo import MongoClient
 import requests
@@ -16,46 +18,103 @@ from urllib.parse import quote_plus
 from dotenv import load_dotenv
 
 # --------------------------------------------------------------
-# Environment Handling (Safe for Local + Streamlit Cloud)
+# ENVIRONMENT HANDLING
 # --------------------------------------------------------------
-
-# ✅ Load .env locally if available
 if os.path.exists(".env"):
     load_dotenv()
     OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
     MONGO_URI = os.getenv("MONGO_URI")
 else:
-    # ✅ Use Streamlit Cloud secrets
     OPENAI_API_KEY = st.secrets["OPENAI_API_KEY"]
     MONGO_URI = st.secrets["MONGO_URI"]
 
-# --------------------------------------------------------------
-# Initialize Clients
-# --------------------------------------------------------------
 client = OpenAI(api_key=OPENAI_API_KEY)
 mongo_client = MongoClient(MONGO_URI)
-db = mongo_client["property_intelligence"]
+db = mongo_client["revalix_property_intelligence"]
 collection = db["property_results"]
 
 # --------------------------------------------------------------
-# Streamlit App Config
+# STREAMLIT CONFIG + CSS THEME
 # --------------------------------------------------------------
-st.set_page_config(page_title="AI Property Intelligence Agent", layout="wide")
-st.title("🏠 AI Property Intelligence Agent")
-st.caption("Factual, ordered property data — auto-saved to MongoDB and retrievable anytime.")
+st.set_page_config(page_title="ReValix AI Property Intelligence", layout="wide")
 
+st.markdown("""
+    <style>
+    /* General Page Theme */
+    .stApp {
+        background: linear-gradient(145deg, #f8fafc, #e2ecf7);
+        color: #0f172a;
+        font-family: 'Inter', sans-serif;
+    }
+    h1, h2, h3 {
+        color: #0ea5e9 !important;
+    }
+    .block-container {
+        background: rgba(255,255,255,0.8);
+        border-radius: 16px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+        padding: 2rem;
+        backdrop-filter: blur(8px);
+    }
+    /* Tabs */
+    .stTabs [data-baseweb="tab-list"] button {
+        font-size: 1rem;
+        color: #1e293b !important;
+        border-radius: 8px;
+        transition: all 0.3s ease-in-out;
+    }
+    .stTabs [data-baseweb="tab-list"] button[data-selected="true"] {
+        background: linear-gradient(90deg, #0ea5e9, #2563eb);
+        color: white !important;
+        font-weight: 700;
+    }
+    /* Loader */
+    .loader {
+        border: 5px solid #e2e8f0;
+        border-top: 5px solid #0ea5e9;
+        border-radius: 50%;
+        width: 40px;
+        height: 40px;
+        animation: spin 1s linear infinite;
+        margin: 20px auto;
+    }
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+    /* Title */
+    .revalix-header {
+        font-size: 2.4rem;
+        text-align: center;
+        color: #0ea5e9;
+        font-weight: 800;
+        letter-spacing: 0.5px;
+        margin-bottom: 0;
+    }
+    .revalix-sub {
+        text-align: center;
+        font-size: 1.1rem;
+        color: #334155;
+        margin-bottom: 35px;
+    }
+    /* DataFrame colors */
+    .dataframe td {
+        border: none !important;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
+st.markdown("<div class='revalix-header'>🏙️ ReValix AI Property Intelligence</div>", unsafe_allow_html=True)
+st.markdown("<div class='revalix-sub'>Property Insights with Real Data with AI </div>", unsafe_allow_html=True)
+
+tab1, tab2 = st.tabs(["🧠 Generate Intelligence", "📜 View Historical Records"])
 
 # --------------------------------------------------------------
-# Tabs
-# --------------------------------------------------------------
-tab1, tab2 = st.tabs(["🧠 Generate & Save Data", "📜 View Past Lookups"])
-
-# --------------------------------------------------------------
-# Field Template
+# FIELD TEMPLATE
 # --------------------------------------------------------------
 def load_field_template():
     data = [
-        ("Property ID", "Unique system-generated identifier"),
+        ("Property ID", "Unique system-generated identifier, Parcel no, APN etc."),
         ("External Reference ID", "From bank, lender, registry, etc."),
         ("Property Name", "Complex / Project / Building Name"),
         ("Property Type", "Residential , Commercial, Industrial, Special Purpose"),
@@ -347,36 +406,217 @@ def load_field_template():
 df_fields = load_field_template()
 
 # --------------------------------------------------------------
-# Helper Functions
+# SECTIONS
+# --------------------------------------------------------------
+def get_field_sections(df_fields):
+    sections = {
+        # ----------------------------------------------------------
+        # 1️⃣ Identification & Basic Property Info
+        # ----------------------------------------------------------
+        "Identification": [
+            "Property ID", "External Reference ID", "Property Name",
+            "Property Type", "Property Subtype", "Ownership Type",
+            "Occupancy Status", "Registration Status", "Registry Reference",
+            "Building Code / Permit ID", "Geo ID"
+        ],
+
+        # ----------------------------------------------------------
+        # 2️⃣ Location & Geography
+        # ----------------------------------------------------------
+        "Location": [
+            "Address Line 1", "Street Name", "City", "County", "Township",
+            "State", "Postal Code", "Latitude", "Longitude",
+            "Facing Direction", "Neighborhood Type", "Neighborhood Name",
+            "Landmark", "Connectivity Score", "Legal Description",
+            "Census Tract", "Market", "Submarket", "Submarket Cluster",
+            "CBSA", "DMA", "State Class Code", "Neighborhood Code",
+            "Map Facet", "Key Map", "Tax District", "Tax Code", "Location Type"
+        ],
+
+        # ----------------------------------------------------------
+        # 3️⃣ Land & Site Details
+        # ----------------------------------------------------------
+        "Land Details": [
+            "Land Area", "Plot No. / Survey No.", "Land Use Code",
+            "Land Market Value Per Square Foot", "Plot Shape", "Topography",
+            "Grade", "Soil Type", "Dimensions", "Ground Coverage",
+            "Easements/Right of Way", "Encroachments",
+            "Land Use Compliance / Zoning", "FSI / FAR Allowed",
+            "Flood Zone", "Flood Map Number", "Flood Map Date",
+            "Flood Plain Area", "Flood Risk Area",
+            "Site Improvements", "Off-Site Improvements",
+            "Immediate access to Highways/Freeways", "Lot Position",
+            "Site Utility", "Frontage Rating", "Access Rating",
+            "Visibility Rating", "Location Rating"
+        ],
+
+        # ----------------------------------------------------------
+        # 4️⃣ Building & Structural Characteristics
+        # ----------------------------------------------------------
+        "Building Details": [
+            "Building Name", "Year of Construction", "Building Style code",
+            "Building Design", "Type", "Age of Building", "Stories", "Buildings",
+            "Exterior", "Structural System", "No. of Floors", "Lift Count",
+            "Fire Safety Systems", "Security Systems", "Building Code",
+            "Building Condition", "GBA", "NRA", "Year of Renovation",
+            "Useful Life", "Effective Age", "Remaining Economic Life",
+            "Building Class", "Foundation", "Total Rooms", "Total Bedroom",
+            "Total Bath", "Interior Flooring", "Ceiling", "Ceiling Height",
+            "Interior Finish %", "Dock Doors", "Roofing", "Heating",
+            "Cooling", "Other Improvements/Extra Features"
+        ],
+
+        # ----------------------------------------------------------
+        # 5️⃣ Unit & Interior Level Details
+        # ----------------------------------------------------------
+        "Unit Details": [
+            "Assessment Information", "Unit No. / Unit Name", "Floor No.",
+            "Unit Type", "Use Type", "Carpet Area", "Built-up Area",
+            "Super Built-up Area", "No. of Rooms", "Bedrooms", "Bathrooms",
+            "Ceiling Height", "Furniture", "Unit Condition",
+            "Balcony / Terrace / Private Outdoor Space", "Occupancy Status",
+            "Occupied Exempt Units", "Occupied Rent-Regulated Units",
+            "Vacant Units", "Appliances Included", "HVAC Type",
+            "Parking Assigned", "Storage Unit Assigned", "Internet/Cable Ready",
+            "ADA Accessibility", "Photos / Floor Plans"
+        ],
+
+        # ----------------------------------------------------------
+        # 6️⃣ Tenancy, Lease & Occupancy
+        # ----------------------------------------------------------
+        "Tenancy and Lease": [
+            "Occupied By", "Number of Tenants", "Lease Structure",
+            "Occupancy at the time of sale", "Exempt %", "Prorated Bldg %",
+            "Parking Ratio", "Parking Spaces", "Lease Status",
+            "Tenant Name (or ID)", "Lease Start Date", "Lease End Date",
+            "Lease Term", "Renewal Options", "Special Clauses",
+            "Current Rent / Lease Rate", "Market Rent", "Lease Duration",
+            "Security Deposit Held", "CAM Charges (Commercial)",
+            "Utilities Included", "Subsidies / Vouchers (if any)",
+            "Vacancy rate", "Tenant Incentives / TI Allowance",
+            "Leasing Commission", "Reimbursements"
+        ],
+
+        # ----------------------------------------------------------
+        # 7️⃣ Ownership, Title & Legal
+        # ----------------------------------------------------------
+        "Ownership and Legal": [
+            "Owner Name(s)", "Title Status", "Registration No.",
+            "Registration Date", "Registrar Office", "Encumbrance Certificate",
+            "Mortgages / Liens", "Occupancy Certificate", "Fire NOC",
+            "Compliance to Local By-laws", "Grantor", "Grantee",
+            "Condition of Sale", "Rights Transferred", "Qualified",
+            "Type of Deed / Instrument", "Covenants / Warranties",
+            "Recording Information", "Miscellaneous Clauses"
+        ],
+
+        # ----------------------------------------------------------
+        # 8️⃣ Market, Sales & Financial Valuation
+        # ----------------------------------------------------------
+        "Market and Financial": [
+            "Purchase Price / Sale Price", "Purchase Date / Sale Date",
+            "Current Market Value", "Current Appaised Value",
+            "Current Land Value", "Current Improvements Value",
+            "Appraised Value History", "Listing Price", "No. of days on market",
+            "Assessed Value", "Land Assessed Value", "Improvements Assessed Value",
+            "Assessed Value History", "Guideline / Circle Rate", "CapEx",
+            "Cap Rate", "Discount rate", "Mortgage Loan", "Loan Date",
+            "Originator", "Mortgage Rate", "Rate Type", "Loan Term",
+            "Monthly Mortgage Payment", "Debt Service",
+            "Debt Service Coverage Ratio (DSCR)", "Equity Rate"
+        ],
+
+        # ----------------------------------------------------------
+        # 9️⃣ Taxes & Assessments
+        # ----------------------------------------------------------
+        "Tax and Assessment": [
+            "Current Tax Year", "Gross Tax", "Special Assessments",
+            "Other Deductions", "Net Tax", "Full Rate", "Effective Rate",
+            "Tax History", "Property Tax"
+        ],
+
+        # ----------------------------------------------------------
+        # 🔟 Amenities, Infrastructure & Utilities
+        # ----------------------------------------------------------
+        "Amenities and Utilities": [
+            "Power Backup", "Water Supply", "Sewage System",
+            "Security", "Internet Connectivity", "Common Areas",
+            "Recreational Amenities", "Green Area", "Parking", "Lighting"
+        ],
+
+        # ----------------------------------------------------------
+        # 11️⃣ Market Dynamics & Performance
+        # ----------------------------------------------------------
+        "Market Performance": [
+            "Market Segment", "Price Trend (12m)", "Supply-Demand Index",
+            "Sales Trend", "Sales to Asking Price Differential",
+            "For Sale Trend", "Transaction Type", "Comparable Properties",
+            "Avg. Comparable Price", "Price Deviation", "Rent Trend",
+            "Direct & Sublet Rent Trend", "Vacancy Rate",
+            "24 Months Lease Renewal Rate", "RBA", "Availability Rate",
+            "Net Absorption SF", "Months on Market", "Months to Lease",
+            "Months Vacant", "Probability of Leasing", "Deliveries SF",
+            "Demolitions SF", "Under Construction SF",
+            "Under Construction Rate", "Preleased Rate", "Start Date",
+            "Complete Date", "Developer/Owner", "Sales Volume",
+            "Market Sale Price per SF", "Market Asking Rent per SF",
+            "Market Cap Rate", "Market Employment by Industry",
+            "Unemployment Rate", "Net Employment Change",
+            "Predicted Value Range"
+        ],
+
+        # ----------------------------------------------------------
+        # 12️⃣ Demographics & Socioeconomic Indicators
+        # ----------------------------------------------------------
+        "Demographics": [
+            "Traffic Count", "Census Tract", "Population in 1, 3 & 5 miles",
+            "Population Growth", "Population", "Households",
+            "Average Household Size", "Total Housing Units",
+            "Owner Occupied Housing Units", "Renter Occupied Housing Units",
+            "Vacant Housing Units", "Labor Force", "Unemployment",
+            "Median Household Income", "Per Capita Income",
+            "Median Home Price", "Latest Population 25+ by Educational Attainment"
+        ],
+
+        # ----------------------------------------------------------
+        # 13️⃣ AI, Predictive & Risk Analytics
+        # ----------------------------------------------------------
+        "AI and Predictive Analytics": [
+            "AI Condition Score", "AI Condition Index", "Structural Integrity Score",
+            "Market Confidence Index", "Price Prediction (Now)",
+            "Price Prediction (12M Ahead)", "Market Liquidity Score",
+            "Risk Classification", "Anomaly Detection", "Automated Summary",
+            "Asset Value by Owner Type", "Sales by Buyer Type", "Sales by Seller Type",
+            "Marketing and Exposure Time"
+        ],
+    }
+    records = []
+    for section, fields in sections.items():
+        for f in fields:
+            if f in df_fields["Field"].values:
+                desc = df_fields.loc[df_fields["Field"] == f, "Description"].values[0]
+                records.append({"Section": section, "Field": f, "Description": desc})
+    return pd.DataFrame(records)
+
+df_sections = get_field_sections(df_fields)
+
+# --------------------------------------------------------------
+# CORE FUNCTIONS
+# --------------------------------------------------------------
+# --------------------------------------------------------------
+# HELPERS
 # --------------------------------------------------------------
 def detect_county_and_state(address):
     try:
         url = f"https://nominatim.openstreetmap.org/search?q={quote_plus(address)}&format=json&addressdetails=1"
-        headers = {"User-Agent": "AiMaster-Property-Agent"}
-        res = requests.get(url, headers=headers, timeout=10)
+        res = requests.get(url, headers={"User-Agent": "ReValix-Agent"}, timeout=10)
         data = res.json()
-        if data and "address" in data[0]:
+        if isinstance(data, list) and len(data) > 0 and "address" in data[0]:
             addr = data[0]["address"]
             return addr.get("county", ""), addr.get("state", "")
     except Exception:
         pass
     return "", ""
-
-
-def find_county_website(county, state):
-    if not county or not state:
-        return None
-    try:
-        res = client.responses.create(
-            model="gpt-4.1-mini",
-            input=f"Provide the official government website URL for {county} County, {state}, USA. Return only the verified URL (no explanation)."
-        )
-        content = res.output[0].content[0].text.strip()
-        match = re.search(r'https?://[^\s]+', content)
-        return match.group(0) if match else content
-    except Exception:
-        return None
-
 
 def parse_table(raw_output):
     records = []
@@ -388,143 +628,165 @@ def parse_table(raw_output):
                 records.append({"Field": field, "Value": value, "Source": source})
             elif len(parts) == 2:
                 field, value = parts
-                records.append({"Field": field, "Value": value, "Source": "Other Government Records"})
+                records.append({"Field": field, "Value": value, "Source": "Government/Verified Records"})
     return records
 
-
-def call_api(prompt):
-    response = client.chat.completions.create(
-        model="gpt-4.1-mini",
-        messages=[
-            {"role": "system", "content": "You are a verified property intelligence engine. Return factual Field–Value–Source tables only."},
-            {"role": "user", "content": prompt}
-        ],
-        temperature=0.0
-    )
-    return response.choices[0].message.content
-
-
-def build_prompt(address, field_list, source_group, county_name, county_url):
-    sources_str = "\n".join(f"- {s}" for s in source_group)
+def build_prompt(address, field_list, section_name, county_name, county_url):
     field_defs = "\n".join([f"{f}: {d}" for f, d in field_list])
-    county_info = f"\nAlso verify via county site: {county_name} ({county_url})." if county_url else ""
+    county_info = f"\nAlso check official county site: {county_name} ({county_url})" if county_url else ""
     return f"""
-You are a **Professional Real Estate Property Intelligence Engine**.
+You are a professional property data intelligence engine.
+Fetch verified and factual information for this property: {address}
 
-Task:
-For property:
-**{address}**
-
-Search these verified sources:
-{sources_str}
-{county_info}
-
-Use these field definitions:
+Section: {section_name}
+Fields:
 {field_defs}
 
-Return table:
-| Field | Value | Source |
-
-Rules:
-- Fill factual values.
-- Keep order.
-- If missing, return "NotFound".
-- Include verified Source.
-"""
-
-
-def merge_and_save(df_ai, df_fields, property_address):
-    merged = (
-        df_ai.groupby("Field", as_index=False)
-        .agg({
-            "Value": lambda vals: next((v for v in vals if v and v != "NotFound"), "NotFound"),
-            "Source": lambda vals: next((s for s in vals if s and s != ""), "Other Government Records")
-        })
-    )
-    df_final = pd.merge(df_fields[["Field"]], merged, on="Field", how="left")
-    df_final["Value"] = df_final["Value"].fillna("NotFound")
-    df_final["Source"] = df_final["Source"].fillna("Other Government Records")
-
-    # Save to MongoDB
-    doc = {"address": property_address, "records": df_final.to_dict(orient="records")}
-    collection.replace_one({"address": property_address}, doc, upsert=True)
-
-    df_final["Field"] = pd.Categorical(df_final["Field"], categories=df_fields["Field"], ordered=True)
-    df_final = df_final.sort_values("Field").reset_index(drop=True)
-    return df_final[["Field", "Value", "Source"]]
-
-
-def highlight_cells(val):
-    if val == "NotFound":
-        return "background-color: #ffcccc; color: #b30000; font-weight: 600;"
-    else:
-        return "background-color: #e6ffe6; color: #006600;"
-
-# ==============================================================
-# 🧠 TAB 1: GENERATE & SAVE
-# ==============================================================
-with tab1:
-    property_address = st.text_input("🏡 Enter Full Property Address:")
-    sources = [
+Use these sources:
         "Zillow", "Trulia", "Costar", "MLS", "Realtor", "Redfin", "Attom", "LoopNet",
         "Corelogic", "Realtytrac", "HouseCanary", "Reonomy", "County Assessor",
         "County Clerk / Recorder / Deeds", "County Tax Office", "Google Maps", "Any Government Records"
-    ]
-    mid = len(sources)//2
-    sources_a, sources_b = sources[:mid], sources[mid:]
 
-    if st.button("🚀 Generate & Save to MongoDB"):
+{county_info}
+
+Return ONLY:
+| Field | Value | Source |
+Missing = NotFound
+"""
+
+# --------------------------------------------------------------
+# ASYNC API CALL
+# --------------------------------------------------------------
+async def call_api_async(session, address, field_list, section_name, county, county_url):
+    prompt = build_prompt(address, field_list, section_name, county, county_url)
+    headers = {"Content-Type": "application/json", "Authorization": f"Bearer {OPENAI_API_KEY}"}
+    payload = {
+        "model": "gpt-4.1-mini",
+        "messages": [
+            {"role": "system", "content": "You are a verified real estate data retriever."},
+            {"role": "user", "content": prompt},
+        ],
+        "temperature": 0.0,
+    }
+
+    try:
+        async with session.post("https://api.openai.com/v1/chat/completions", json=payload, headers=headers, timeout=60) as resp:
+            data = await resp.json()
+            return data.get("choices", [{}])[0].get("message", {}).get("content", "")
+    except Exception as e:
+        print(f"API call error for {section_name}: {e}")
+        return ""
+
+# --------------------------------------------------------------
+# MERGE AND SAVE
+# --------------------------------------------------------------
+def merge_and_save(df_ai, df_fields, property_address):
+    if df_ai.empty:
+        df_ai = pd.DataFrame(columns=["Field", "Value", "Source"])
+
+    df_fields = df_fields.drop_duplicates(subset=["Field"], keep="first")
+    merged = (
+        df_ai.groupby("Field", as_index=False)
+        .agg({
+            "Value": lambda v: next((x for x in v if x and x != "NotFound"), "NotFound"),
+            "Source": lambda s: next((x for x in s if x and x != ""), "Government/Verified Records"),
+        })
+    )
+    df_final = pd.merge(df_fields[["Field"]], merged, on="Field", how="left")
+    df_final["Value"].fillna("NotFound", inplace=True)
+    df_final["Source"].fillna("Government/Verified Records", inplace=True)
+
+    try:
+        collection.replace_one({"address": property_address}, {"address": property_address, "records": df_final.to_dict(orient="records")}, upsert=True)
+    except Exception as e:
+        print("MongoDB save error:", e)
+
+    return df_final
+
+# --------------------------------------------------------------
+# FINAL RETRY FOR MISSING FIELDS
+# --------------------------------------------------------------
+async def run_missing_fields_retry(property_address, df_final, df_fields, county, county_url):
+    missing = df_final[df_final["Value"] == "NotFound"]["Field"].tolist()
+    if not missing:
+        st.info("✅ All fields successfully retrieved.")
+        return df_final
+
+    st.warning(f"🔁 Re-fetching {len(missing)} missing fields...")
+    missing_defs = df_fields[df_fields["Field"].isin(missing)][["Field", "Description"]].values.tolist()
+    prompt = build_prompt(property_address, missing_defs, "Final Retry", county, county_url)
+
+    headers = {"Content-Type": "application/json", "Authorization": f"Bearer {OPENAI_API_KEY}"}
+    payload = {
+        "model": "gpt-4.1-mini",
+        "messages": [{"role": "system", "content": "Fill factual property data only."}, {"role": "user", "content": prompt}],
+        "temperature": 0.0,
+    }
+
+    async with aiohttp.ClientSession() as session:
+        async with session.post("https://api.openai.com/v1/chat/completions", json=payload, headers=headers) as resp:
+            data = await resp.json()
+            content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
+
+    new_records = parse_table(content)
+    df_new = pd.DataFrame(new_records)
+    for _, row in df_new.iterrows():
+        df_final.loc[df_final["Field"] == row["Field"], ["Value", "Source"]] = [row["Value"], row["Source"]]
+    st.success("✨ Missing fields refined and updated successfully.")
+    return df_final
+
+# --------------------------------------------------------------
+# TAB 1 — GENERATE DATA
+# --------------------------------------------------------------
+with tab1:
+    st.markdown("### 🧠 Generate Property Intelligence")
+    property_address = st.text_input("🏡 Enter Full Property Address:")
+
+    if st.button("🚀 Generate Report", use_container_width=True):
         if not property_address.strip():
-            st.warning("⚠️ Please enter a property address first.")
+            st.warning("⚠️ Please enter a property address.")
         else:
-            with st.spinner("Detecting county and fetching verified data..."):
+            with st.spinner("Detecting location and processing sections..."):
                 county, state = detect_county_and_state(property_address)
-                county_url = find_county_website(county, state)
+                county_url = f"https://www.{county.lower().replace(' ', '')}{state.lower().replace(' ', '')}.gov" if county and state else ""
 
-            if county:
-                st.success(f"📍 County Detected: **{county}, {state}**")
-            if county_url:
-                st.info(f"🌐 County Site: {county_url}")
+            st.success(f"📍 County Detected: {county}, {state}")
+            async def process_sections():
+                async with aiohttp.ClientSession() as session:
+                    tasks = []
+                    for section_name in df_sections["Section"].unique():
+                        fields = df_sections[df_sections["Section"] == section_name][["Field", "Description"]].values.tolist()
+                        tasks.append(call_api_async(session, property_address, fields, section_name, county, county_url))
+                    results = await asyncio.gather(*tasks)
+                    return results
 
-            field_list = list(zip(df_fields["Field"], df_fields["Description"]))
-            st.info("🔍 Fetching and mapping property data from verified sources...")
+            results = asyncio.run(process_sections())
+            all_records = []
+            for content in results:
+                all_records.extend(parse_table(content))
+            df_ai = pd.DataFrame(all_records)
 
-            output_a = call_api(build_prompt(property_address, field_list, sources_a, county, county_url))
-            output_b = call_api(build_prompt(property_address, field_list, sources_b, county, county_url))
-
-            df_ai = pd.DataFrame(parse_table(output_a) + parse_table(output_b))
             df_final = merge_and_save(df_ai, df_fields, property_address)
+            df_final = asyncio.run(run_missing_fields_retry(property_address, df_final, df_fields, county, county_url))
 
-            st.success(f"✅ Data for {property_address} saved to MongoDB.")
-            st.dataframe(df_final[["Field", "Value"]].style.applymap(highlight_cells, subset=["Value"]), use_container_width=True)
+            st.success(f"✅ Intelligence report for {property_address} generated successfully.")
+            st.dataframe(df_final[["Field", "Value"]], use_container_width=True)
 
             output = BytesIO()
             df_final.drop(columns=["Source"]).to_excel(output, index=False)
-            st.download_button(
-                label="⬇️ Download Excel (Field + Value)",
-                data=output.getvalue(),
-                file_name=f"property_data_{property_address.replace(',', '').replace(' ', '_')}.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            )
+            st.download_button("⬇️ Download Report (Excel)", data=output.getvalue(), file_name=f"ReValix_{property_address.replace(' ', '_')}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
-            st.caption("🟩 Green = Found | 🟥 Red = NotFound | Data stored in MongoDB with sources.")
-
-# ==============================================================
-# 📜 TAB 2: VIEW PAST LOOKUPS
-# ==============================================================
+# --------------------------------------------------------------
+# TAB 2 — HISTORY
+# --------------------------------------------------------------
 with tab2:
-    st.subheader("🔎 View Property Data from MongoDB")
-    search_address = st.text_input("🏠 Enter Property Address to Search:")
-    if st.button("🔍 Search in MongoDB"):
-        if not search_address.strip():
-            st.warning("⚠️ Please enter an address.")
+    st.markdown("### 📜 View Saved Reports")
+    search_address = st.text_input("🏠 Search by Address:")
+    if st.button("🔍 Retrieve Report", use_container_width=True):
+        doc = collection.find_one({"address": search_address})
+        if doc:
+            df_past = pd.DataFrame(doc["records"])[["Field", "Value"]]
+            st.success(f"✅ Showing saved report for: {search_address}")
+            st.dataframe(df_past, use_container_width=True)
         else:
-            doc = collection.find_one({"address": search_address})
-            if doc:
-                df_past = pd.DataFrame(doc["records"])[["Field", "Value"]]
-                st.success(f"✅ Showing saved results for: {search_address}")
-                st.dataframe(df_past.style.applymap(highlight_cells, subset=["Value"]), use_container_width=True)
-            else:
-                st.error("❌ No record found for this address in MongoDB.")
-
-
+            st.error("❌ No records found for this address.")
