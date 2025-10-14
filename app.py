@@ -645,10 +645,8 @@ Section: {section_name}
 Fields:
 {field_defs}
 
-Use these sources:
-        "Zillow", "Trulia", "Costar", "MLS", "Realtor", "Redfin", "Attom", "LoopNet",
-        "Corelogic", "Realtytrac", "HouseCanary", "Reonomy", "County Assessor",
-        "County Clerk / Recorder / Deeds", "County Tax Office", "Google Maps", "Any Government Records"
+Use these sources: any of the sources available on web using gpt which could provide better results 
+
 
 {county_info}
 
@@ -793,4 +791,5 @@ with tab2:
             st.dataframe(df_past, use_container_width=True)
         else:
             st.error("❌ No records found for this address.")
+
 
