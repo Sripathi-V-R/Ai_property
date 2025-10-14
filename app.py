@@ -189,7 +189,6 @@ Fetch the accurate value for each field below for the property: {address}
 Fields:
 {field_defs}
 
-Use trusted sources and provide the actual result properly 
 {county_info}
 
 Return strictly in markdown table:
@@ -327,3 +326,4 @@ with tab2:
             st.dataframe(df_past, use_container_width=True)
         else:
             st.error("❌ No records found for this address.")
+
