@@ -1,7 +1,6 @@
-
 # ==============================================================
 #  🏙️ ReValix AI Property Intelligence
-#  (Async Section Calls + Smart Retry + Modern UI)
+#  (GPT-5 Accurate Mode + Async Fetch + MongoDB Storage)
 #  Author: Ai Master | Powered by GPT-5
 # ==============================================================
 
@@ -50,35 +49,11 @@ st.markdown("""
         color: #0ea5e9 !important;
     }
     .block-container {
-        background: rgba(255,255,255,0.8);
+        background: rgba(255,255,255,0.85);
         border-radius: 16px;
         box-shadow: 0 4px 20px rgba(0,0,0,0.05);
         padding: 2rem;
-        backdrop-filter: blur(8px);
-    }
-    .stTabs [data-baseweb="tab-list"] button {
-        font-size: 1rem;
-        color: #1e293b !important;
-        border-radius: 8px;
-        transition: all 0.3s ease-in-out;
-    }
-    .stTabs [data-baseweb="tab-list"] button[data-selected="true"] {
-        background: linear-gradient(90deg, #0ea5e9, #2563eb);
-        color: white !important;
-        font-weight: 700;
-    }
-    .loader {
-        border: 5px solid #e2e8f0;
-        border-top: 5px solid #0ea5e9;
-        border-radius: 50%;
-        width: 40px;
-        height: 40px;
-        animation: spin 1s linear infinite;
-        margin: 20px auto;
-    }
-    @keyframes spin {
-        0% { transform: rotate(0deg); }
-        100% { transform: rotate(360deg); }
+        backdrop-filter: blur(10px);
     }
     .revalix-header {
         font-size: 2.4rem;
@@ -98,115 +73,67 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.markdown("<div class='revalix-header'>🏙️ ReValix AI Property Intelligence</div>", unsafe_allow_html=True)
-st.markdown("<div class='revalix-sub'>AI-Powered Real Estate Intelligence Engine</div>", unsafe_allow_html=True)
+st.markdown("<div class='revalix-sub'>AI-Powered Real Estate Intelligence Engine (GPT-5 Accurate Mode)</div>", unsafe_allow_html=True)
 
 tab1, tab2 = st.tabs(["🧠 Generate Intelligence", "📜 View Past Reports"])
 
 # --------------------------------------------------------------
-# FIELD TEMPLATE (simplified)
+# FIELD TEMPLATE
 # --------------------------------------------------------------
 def load_field_template():
     data = [
-    ("Property ID", "Unique identifier like Parcel/APN/Tax ID"),
-    ("Property Type", "Residential, Commercial, or Industrial"),
-    ("Property Subtype", "Single Family / Office / Retail / Warehouse"),
-    ("Address Line 1", "Street address of the property"),
-    ("City", "City or Municipality name"),
-    ("County", "County or District"),
-    ("State", "State or Province"),
-    ("Postal Code", "ZIP / PIN code"),
-    ("Latitude", "GIS coordinate"),
-    ("Longitude", "GIS coordinate"),
-    ("Land Area", "Total land area in sqft or acres"),
-    ("Building Name", "Name of the building or complex"),
-    ("Year of Construction", "Construction year"),
-    ("Building Condition", "Excellent / Good / Fair / Poor"),
-    ("Stories", "Number of floors"),
-    ("Units", "Number of housing/commercial units"),
-    ("Total Rooms", "Total room count"),
-    ("Bathrooms", "Total bathroom count"),
-    ("Ownership Type", "Freehold / Leasehold / Co-op"),
-    ("Owner Name", "Registered property owner(s)"),
-    ("Occupancy Status", "Occupied / Vacant / Under Construction"),
-    ("Current Market Value", "Estimated current market value"),
-    ("Appraised Value", "Assessor’s appraised value"),
-    ("Purchase Price", "Most recent sale price"),
-    ("Purchase Date", "Date of sale or purchase"),
-    ("Property Tax", "Annual tax amount"),
-    ("Market Cap Rate", "Capitalization rate for valuation"),
-    ("Market Rent", "Comparable average rent"),
-    ("Vacancy Rate", "Percent unoccupied"),
-    ("Flood Zone", "FEMA classification"),
-    ("Zoning Code", "Municipal zoning classification"),
-    ("Neighborhood Type", "Residential / Commercial / Mixed"),
-    ("Legal Description", "Official parcel/legal description"),
-    ("AI Condition Index", "AI-based property condition score"),
-]
+        ("Property ID", "Unique identifier like Parcel/APN/Tax ID"),
+        ("Property Type", "Residential, Commercial, or Industrial"),
+        ("Property Subtype", "Single Family / Office / Retail / Warehouse"),
+        ("Address Line 1", "Street address of the property"),
+        ("City", "City or Municipality name"),
+        ("County", "County or District"),
+        ("State", "State or Province"),
+        ("Postal Code", "ZIP / PIN code"),
+        ("Latitude", "GIS coordinate"),
+        ("Longitude", "GIS coordinate"),
+        ("Land Area", "Total land area in sqft or acres"),
+        ("Building Name", "Name of the building or complex"),
+        ("Year of Construction", "Construction year"),
+        ("Building Condition", "Excellent / Good / Fair / Poor"),
+        ("Stories", "Number of floors"),
+        ("Units", "Number of housing/commercial units"),
+        ("Total Rooms", "Total room count"),
+        ("Bathrooms", "Total bathroom count"),
+        ("Ownership Type", "Freehold / Leasehold / Co-op"),
+        ("Owner Name", "Registered property owner(s)"),
+        ("Occupancy Status", "Occupied / Vacant / Under Construction"),
+        ("Current Market Value", "Estimated current market value"),
+        ("Appraised Value", "Assessor’s appraised value"),
+        ("Purchase Price", "Most recent sale price"),
+        ("Purchase Date", "Date of sale or purchase"),
+        ("Property Tax", "Annual tax amount"),
+        ("Market Cap Rate", "Capitalization rate for valuation"),
+        ("Market Rent", "Comparable average rent"),
+        ("Vacancy Rate", "Percent unoccupied"),
+        ("Flood Zone", "FEMA classification"),
+        ("Zoning Code", "Municipal zoning classification"),
+        ("Neighborhood Type", "Residential / Commercial / Mixed"),
+        ("Legal Description", "Official parcel/legal description"),
+        ("AI Condition Index", "AI-based property condition score"),
+    ]
     return pd.DataFrame(data, columns=["Field", "Description"])
 
 df_fields = load_field_template()
 
 # --------------------------------------------------------------
-# SECTION TEMPLATE (you can expand this later)
+# SECTION MAPPING
 # --------------------------------------------------------------
 def get_field_sections(df_fields):
     sections = {
-    "Identification": [
-        "Property ID",
-        "Property Type",
-        "Property Subtype"
-    ],
-
-    "Location": [
-        "Address Line 1",
-        "City",
-        "County",
-        "State",
-        "Postal Code",
-        "Latitude",
-        "Longitude"
-    ],
-
-    "Land & Zoning": [
-        "Land Area",
-        "Flood Zone",
-        "Zoning Code",
-        "Neighborhood Type",
-        "Legal Description"
-    ],
-
-    "Building Details": [
-        "Building Name",
-        "Year of Construction",
-        "Building Condition",
-        "Stories",
-        "Units",
-        "Total Rooms",
-        "Bathrooms"
-    ],
-
-    "Ownership & Status": [
-        "Ownership Type",
-        "Owner Name",
-        "Occupancy Status"
-    ],
-
-    "Market & Financial": [
-        "Current Market Value",
-        "Appraised Value",
-        "Purchase Price",
-        "Purchase Date",
-        "Property Tax",
-        "Market Cap Rate",
-        "Market Rent",
-        "Vacancy Rate"
-    ],
-
-    "AI Insights": [
-        "AI Condition Index"
-    ]
-}
-
+        "Identification": ["Property ID", "Property Type", "Property Subtype"],
+        "Location": ["Address Line 1", "City", "County", "State", "Postal Code", "Latitude", "Longitude"],
+        "Land & Zoning": ["Land Area", "Flood Zone", "Zoning Code", "Neighborhood Type", "Legal Description"],
+        "Building Details": ["Building Name", "Year of Construction", "Building Condition", "Stories", "Units", "Total Rooms", "Bathrooms"],
+        "Ownership & Status": ["Ownership Type", "Owner Name", "Occupancy Status"],
+        "Market & Financial": ["Current Market Value", "Appraised Value", "Purchase Price", "Purchase Date", "Property Tax", "Market Cap Rate", "Market Rent", "Vacancy Rate"],
+        "AI Insights": ["AI Condition Index"]
+    }
 
     records = []
     for section, fields in sections.items():
@@ -241,32 +168,44 @@ def parse_table(raw_output):
             if len(parts) == 3:
                 field, value, source = parts
                 records.append({"Field": field, "Value": value, "Source": source})
-            elif len(parts) == 2:
-                field, value = parts
-                records.append({"Field": field, "Value": value, "Source": "Government/Verified Records"})
     return records
 
+# --------------------------------------------------------------
+# GPT-5 ACCURATE PROMPT BUILDER
+# --------------------------------------------------------------
 def build_prompt(address, field_list, section_name, county_name, county_url):
-    field_defs = "\n".join([f"{f}: {d}" for f, d in field_list])
-    county_info = f"\nAlso check official county site: {county_name} ({county_url})" if county_url else ""
-    return f"""
-You are a verified property data retriever.
-Fetch the accurate value for each field below for the property: {address}
- important : accurate result has to be provided. check any sources you needed. 
-Fields:
-{field_defs}
+    field_defs = "\n".join([f"- {f}: {d}" for f, d in field_list])
+    county_info = f"\nOfficial county reference: {county_name} ({county_url})" if county_url else ""
 
+    return f"""
+You are **ReValix AI**, an expert real estate intelligence agent.
+Your task is to fetch **only accurate, verified property data** for the following address.
+
+🏠 **Address:** {address}
+📘 **Section:** {section_name}
+
+---
+### Rules for GPT-5:
+1. Search verified data sources (Zillow, Redfin, Realtor, LoopNet, County GIS, FEMA, OSM).
+2. **Do not estimate or guess.** Provide only confirmed facts.
+3. Every value must include a **verified source name or domain**.
+4. If the value cannot be found → return `NotFound`.
+5. Prefer assessor and GIS data when available.
+6. Keep format strict and concise.
+
+### Fields:
+{field_defs}
 
 {county_info}
 
-Return strictly in markdown table:
+---
+Return ONLY this table:
 | Field | Value | Source |
-
-Missing = NotFound
+|-------|--------|--------|
 """
 
 # --------------------------------------------------------------
-# ASYNC API CALL
+# GPT-5 ASYNC CALL
 # --------------------------------------------------------------
 async def call_api_async(session, address, field_list, section_name, county, county_url):
     prompt = build_prompt(address, field_list, section_name, county, county_url)
@@ -274,14 +213,15 @@ async def call_api_async(session, address, field_list, section_name, county, cou
     payload = {
         "model": "gpt-5",
         "messages": [
-            {"role": "system", "content": "You are a verified real estate data retriever."},
+            {"role": "system", "content": "You are ReValix AI — a verified real estate data retriever using trusted sources only."},
             {"role": "user", "content": prompt},
         ],
         "temperature": 0.0,
+        "max_tokens": 1500
     }
 
     try:
-        async with session.post("https://api.openai.com/v1/chat/completions", json=payload, headers=headers, timeout=60) as resp:
+        async with session.post("https://api.openai.com/v1/chat/completions", json=payload, headers=headers, timeout=120) as resp:
             data = await resp.json()
             return data.get("choices", [{}])[0].get("message", {}).get("content", "")
     except Exception as e:
@@ -289,7 +229,7 @@ async def call_api_async(session, address, field_list, section_name, county, cou
         return ""
 
 # --------------------------------------------------------------
-# MERGE AND SAVE
+# MERGE + SAVE
 # --------------------------------------------------------------
 def merge_and_save(df_ai, df_fields, property_address):
     if df_ai.empty:
@@ -300,12 +240,12 @@ def merge_and_save(df_ai, df_fields, property_address):
         df_ai.groupby("Field", as_index=False)
         .agg({
             "Value": lambda v: next((x for x in v if x and x != "NotFound"), "NotFound"),
-            "Source": lambda s: next((x for x in s if x and x != ""), "Government/Verified Records"),
+            "Source": lambda s: next((x for x in s if x and x != ""), "Verified Source"),
         })
     )
     df_final = pd.merge(df_fields[["Field"]], merged, on="Field", how="left")
     df_final["Value"].fillna("NotFound", inplace=True)
-    df_final["Source"].fillna("Government/Verified Records", inplace=True)
+    df_final["Source"].fillna("Verified Source", inplace=True)
 
     try:
         collection.replace_one({"address": property_address}, {"address": property_address, "records": df_final.to_dict(orient="records")}, upsert=True)
@@ -329,8 +269,9 @@ async def run_missing_fields_retry(property_address, df_final, df_fields, county
 
     headers = {"Content-Type": "application/json", "Authorization": f"Bearer {OPENAI_API_KEY}"}
     payload = {
-        "model": "gpt-4.1-mini",
-        "messages": [{"role": "system", "content": "Fill factual property data only."}, {"role": "user", "content": prompt}],
+        "model": "gpt-5",
+        "messages": [{"role": "system", "content": "Provide verified factual property data only."},
+                     {"role": "user", "content": prompt}],
         "temperature": 0.0,
     }
 
@@ -343,11 +284,11 @@ async def run_missing_fields_retry(property_address, df_final, df_fields, county
     df_new = pd.DataFrame(new_records)
     for _, row in df_new.iterrows():
         df_final.loc[df_final["Field"] == row["Field"], ["Value", "Source"]] = [row["Value"], row["Source"]]
-    st.success("✨ Missing fields refined and updated successfully.")
+    st.success("✨ Missing fields refined successfully.")
     return df_final
 
 # --------------------------------------------------------------
-# TAB 1 — GENERATE DATA
+# TAB 1 — GENERATE
 # --------------------------------------------------------------
 with tab1:
     st.markdown("### 🧠 Generate Property Intelligence")
@@ -362,6 +303,7 @@ with tab1:
                 county_url = f"https://www.{county.lower().replace(' ', '')}{state.lower().replace(' ', '')}.gov" if county and state else ""
 
             st.success(f"📍 County Detected: {county}, {state}")
+
             async def process_sections():
                 async with aiohttp.ClientSession() as session:
                     tasks = []
@@ -381,7 +323,7 @@ with tab1:
             df_final = asyncio.run(run_missing_fields_retry(property_address, df_final, df_fields, county, county_url))
 
             st.success(f"✅ Intelligence report for {property_address} generated successfully.")
-            st.dataframe(df_final[["Field", "Value"]], use_container_width=True)
+            st.dataframe(df_final[["Field", "Value", "Source"]], use_container_width=True)
 
             output = BytesIO()
             df_final.drop(columns=["Source"]).to_excel(output, index=False)
@@ -396,12 +338,8 @@ with tab2:
     if st.button("🔍 Retrieve Report", use_container_width=True):
         doc = collection.find_one({"address": search_address})
         if doc:
-            df_past = pd.DataFrame(doc["records"])[["Field", "Value"]]
+            df_past = pd.DataFrame(doc["records"])[["Field", "Value", "Source"]]
             st.success(f"✅ Showing saved report for: {search_address}")
             st.dataframe(df_past, use_container_width=True)
         else:
             st.error("❌ No records found for this address.")
-
-
-
-
