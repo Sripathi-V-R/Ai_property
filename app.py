@@ -180,21 +180,49 @@ def parse_table(raw_output):
     return records
 
 def build_prompt(address, field_list, section_name, county_name, county_url):
-    field_defs = "\n".join([f"{f}: {d}" for f, d in field_list])
-    county_info = f"\nAlso check official county site: {county_name} ({county_url})" if county_url else ""
+    # Prepare field list neatly
+    field_defs = "\n".join([f"- {f}: {d}" for f, d in field_list])
+    county_info = f"\nOfficial county reference: {county_name} ({county_url})" if county_url else ""
+
     return f"""
-You are a verified property data retriever.
-Fetch the accurate value for each field below for the property: {address}
+You are **ReValix AI**, an intelligent property data retrieval agent designed for real estate professionals.
 
-Fields:
-{field_defs}
+🎯 **Objective:**
+Return accurate, verifiable information for the property:
+**{address}**
 
+🏛 **Primary Data Sources (use reasoning + web references):**
+- Zillow.com
+- Redfin.com
+- Realtor.com
+- PropertyShark.com
+- County Assessor / Auditor Website
+- FEMA Flood Maps
+- U.S. Census / GIS public records
 {county_info}
 
-Return strictly in markdown table:
+📘 **Rules & Response Format**
+- Respond **only** with a Markdown table.
+- Every field must appear exactly once.
+- Use `NotFound` for missing data.
+- Do **not** invent data.
+- If unsure, return `NotFound` with a plausible source like “Public Record / GIS”.
+- Include the **most authoritative source** (e.g. “Summit County Auditor”, “Zillow”, “Realtor.com”).
+- Always provide realistic values (e.g. year as 4 digits, coordinates in decimals).
+
+📋 **Section:** {section_name}
+
+**Fields to Retrieve:**
+{field_defs}
+
+🔽 **Return the final output in exactly this format:**
+
 | Field | Value | Source |
-Missing = NotFound
+|--------|--------|--------|
+| Field1 | ExampleValue | SourceSite |
+| Field2 | NotFound | County Record |
 """
+
 
 # --------------------------------------------------------------
 # ASYNC CALL
@@ -203,10 +231,10 @@ async def call_api_async(session, address, field_list, section_name, county, cou
     prompt = build_prompt(address, field_list, section_name, county, county_url)
     headers = {"Content-Type": "application/json", "Authorization": f"Bearer {OPENAI_API_KEY}"}
     payload = {
-        "model": "gpt-4.1-mini",
+        "model": "gpt-5",
         "messages": [
-            {"role": "system", "content": "You are a verified real estate data retriever."},
-            {"role": "user", "content": prompt},
+            {"role": "system", "content": "You are ReValix AI — only fill factual property data."},
+            {"role": "user", "content": prompt}
         ],
         "temperature": 0.0,
     }
@@ -326,5 +354,6 @@ with tab2:
             st.dataframe(df_past, use_container_width=True)
         else:
             st.error("❌ No records found for this address.")
+
 
 
