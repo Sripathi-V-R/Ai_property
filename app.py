@@ -16,6 +16,7 @@ import re
 from io import BytesIO
 from urllib.parse import quote_plus
 from dotenv import load_dotenv
+from streamlit_lottie import st_lottie
 
 # --------------------------------------------------------------
 # ENVIRONMENT HANDLING
@@ -46,21 +47,38 @@ st.markdown("""
     font-family: 'Inter', sans-serif;
 }
 .block-container {
-    background: rgba(255,255,255,0.8);
+    background: rgba(255,255,255,0.85);
     border-radius: 16px;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.08);
     padding: 2rem;
-    backdrop-filter: blur(8px);
+    backdrop-filter: blur(10px);
 }
 h1, h2, h3 { color: #0ea5e9 !important; }
 .revalix-header { font-size: 2.4rem; text-align: center; color: #0ea5e9; font-weight: 800; }
 .revalix-sub { text-align: center; font-size: 1.1rem; color: #334155; margin-bottom: 35px; }
+.dataframe td { font-weight: 500; }
+.highlight-red { color: red; font-weight: 700; }
 </style>
 """, unsafe_allow_html=True)
 
 st.markdown("<div class='revalix-header'>🏙️ ReValix AI Property Intelligence</div>", unsafe_allow_html=True)
 st.markdown("<div class='revalix-sub'>AI-Powered Property Data Enrichment (GPT-4.1-mini + ATTOM)</div>", unsafe_allow_html=True)
 tab1, tab2 = st.tabs(["🧠 Generate Intelligence", "📜 View Past Reports"])
+
+# --------------------------------------------------------------
+# LOTTIE LOADERS
+# --------------------------------------------------------------
+def load_lottie_url(url: str):
+    try:
+        r = requests.get(url)
+        if r.status_code == 200:
+            return r.json()
+    except Exception:
+        pass
+    return None
+
+LOTTIE_LOADING = load_lottie_url("https://assets10.lottiefiles.com/packages/lf20_j1adxtyb.json")
+LOTTIE_SUCCESS = load_lottie_url("https://assets2.lottiefiles.com/packages/lf20_jcikwtux.json")
 
 # --------------------------------------------------------------
 # FIELD TEMPLATE
@@ -554,7 +572,7 @@ def get_field_sections(df_fields):
 df_sections = get_field_sections(df_fields)
 
 # --------------------------------------------------------------
-# ATTOM FETCH & FLATTEN
+# ATTOM FETCH + FLATTEN
 # --------------------------------------------------------------
 def safe_get(d, keys):
     for k in keys:
@@ -578,16 +596,13 @@ def fetch_attom_data(address):
         res.raise_for_status()
         data = res.json()
         return data.get("property", [])
-    except Exception as e:
-        print("ATTOM fetch error:", e)
+    except Exception:
         return []
 
 def flatten_attom_properties(properties):
-    """Flatten all relevant ATTOM property fields into a single row per property."""
     rows = []
     for p in properties:
         r = {}
-
         # --------------------------------------------------------------
         # ADDRESS
         # --------------------------------------------------------------
@@ -743,7 +758,6 @@ def flatten_attom_properties(properties):
         r["Publication Date"] = safe_get(p, ["vintage", "pubDate"])
 
         rows.append(r)
-
     return pd.DataFrame(rows)
 
 # --------------------------------------------------------------
@@ -777,7 +791,6 @@ def parse_table(raw_output):
 def build_prompt(address, field_list, section_name, county_name, county_url, attom_df):
     field_defs = "\n".join([f"{f}: {d}" for f, d in field_list])
     attom_text = attom_df.to_string(index=False) if not attom_df.empty else "None"
-    county_info = f"\nAlso check official county site: {county_name} ({county_url})" if county_url else ""
     return f"""
 You are a verified property intelligence assistant.
 Retrieve accurate factual data for: {address}
@@ -786,11 +799,8 @@ Section: {section_name}
 Fields:
 {field_defs}
 
-ATTOM verified data (use this to cross-check or fill missing values):
+ATTOM verified data (use to cross-check):
 {attom_text}
-
-Use trusted real estate sources: Zillow, Redfin, County Assessor, ATTOM, Realtor.
-{county_info}
 
 Return strictly:
 | Field | Value | Source |
@@ -840,33 +850,6 @@ def merge_and_save(df_ai, df_fields, property_address, df_attom):
     return df_final
 
 # --------------------------------------------------------------
-# RETRY MISSING FIELDS
-# --------------------------------------------------------------
-async def run_missing_retry(property_address, df_final, df_fields, county, county_url):
-    missing = df_final[df_final["Value"] == "NotFound"]["Field"].tolist()
-    if not missing:
-        st.info("✅ All fields successfully retrieved.")
-        return df_final
-    st.warning(f"🔁 Retrying {len(missing)} missing fields...")
-    missing_defs = df_fields[df_fields["Field"].isin(missing)][["Field", "Description"]].values.tolist()
-    prompt = build_prompt(property_address, missing_defs, "Final Retry", county, county_url, pd.DataFrame())
-    headers = {"Authorization": f"Bearer {OPENAI_API_KEY}"}
-    payload = {
-        "model": "gpt-4.1-mini",
-        "messages": [{"role": "user", "content": prompt}],
-        "temperature": 0.0,
-    }
-    async with aiohttp.ClientSession() as session:
-        async with session.post("https://api.openai.com/v1/chat/completions", json=payload, headers=headers) as resp:
-            data = await resp.json()
-            content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
-            df_new = pd.DataFrame(parse_table(content))
-            for _, row in df_new.iterrows():
-                df_final.loc[df_final["Field"] == row["Field"], ["Value", "Source"]] = [row["Value"], row["Source"]]
-    st.success("✨ Missing fields updated successfully.")
-    return df_final
-
-# --------------------------------------------------------------
 # TAB 1 — GENERATE DATA
 # --------------------------------------------------------------
 with tab1:
@@ -877,14 +860,14 @@ with tab1:
         if not property_address.strip():
             st.warning("⚠️ Please enter an address.")
         else:
-            with st.spinner("Fetching verified ATTOM data..."):
-                attom_props = fetch_attom_data(property_address)
-                df_attom = flatten_attom_properties(attom_props) if attom_props else pd.DataFrame()
-                if not df_attom.empty:
-                    st.success(f"✅ ATTOM data found with {len(df_attom.columns)} fields.")
-                else:
-                    st.warning("⚠️ No ATTOM data found, GPT-only mode.")
+            placeholder = st.empty()
+            with placeholder.container():
+                st_lottie(LOTTIE_LOADING, height=220, key="loading")
+                st.markdown("<h4 style='text-align:center;'>Analyzing property data with AI...</h4>", unsafe_allow_html=True)
 
+            # hidden ATTOM + GPT fetching
+            attom_props = fetch_attom_data(property_address)
+            df_attom = flatten_attom_properties(attom_props) if attom_props else pd.DataFrame()
             county, state = detect_county_and_state(property_address)
             county_url = f"https://www.{county.lower().replace(' ', '')}{state.lower().replace(' ', '')}.gov" if county and state else ""
 
@@ -901,17 +884,21 @@ with tab1:
             all_records = []
             for content in results:
                 all_records.extend(parse_table(content))
-
             df_ai = pd.DataFrame(all_records)
             df_final = merge_and_save(df_ai, df_fields, property_address, df_attom)
-            df_final = asyncio.run(run_missing_retry(property_address, df_final, df_fields, county, county_url))
 
-            st.success(f"✅ Report generated for {property_address}")
-            st.dataframe(df_final[["Field", "Value"]], use_container_width=True)
+            placeholder.empty()
+            st_lottie(LOTTIE_SUCCESS, height=200, key="success")
+            st.success(f"✅ Report generated successfully for **{property_address}**")
 
+            # Highlight NotFound values
+            styled_df = df_final[["Field", "Value"]].style.applymap(lambda v: "color: red; font-weight:700;" if v == "NotFound" else "")
+            st.dataframe(styled_df, use_container_width=True)
+
+            # Excel download
             output = BytesIO()
             df_final.drop(columns=["Source"]).to_excel(output, index=False)
-            st.download_button("⬇️ Download Report", data=output.getvalue(),
+            st.download_button("⬇️ Download Report (Excel)", data=output.getvalue(),
                                file_name=f"ReValix_{property_address.replace(' ', '_')}.xlsx",
                                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
