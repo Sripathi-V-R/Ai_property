@@ -8,5 +8,6 @@ openpyxl
 aiohttp
 beautifulsoup4
 streamlit-lottie
+more_itertools
 
 
