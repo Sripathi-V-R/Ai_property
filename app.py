@@ -62,7 +62,7 @@ h1, h2, h3 { color: #0ea5e9 !important; }
 """, unsafe_allow_html=True)
 
 st.markdown("<div class='revalix-header'>🏙️ ReValix AI Property Intelligence</div>", unsafe_allow_html=True)
-st.markdown("<div class='revalix-sub'>AI-Powered Property Data Enrichment (GPT-4.1-mini + ATTOM)</div>", unsafe_allow_html=True)
+st.markdown("<div class='revalix-sub'>AI-Powered Property Data Enrichment</div>", unsafe_allow_html=True)
 tab1, tab2 = st.tabs(["🧠 Generate Intelligence", "📜 View Past Reports"])
 
 # --------------------------------------------------------------
@@ -854,7 +854,7 @@ def merge_and_save(df_ai, df_fields, property_address, df_attom):
 # --------------------------------------------------------------
 with tab1:
     st.markdown("### 🧠 Generate Property Intelligence")
-    property_address = st.text_input("🏡 Enter Full Property Address:")
+    property_address = st.text_input("🏡 Enter Full Property Address: ( Eg:2850 S Arlington Rd, Akron, OH 44312 )")
 
     if st.button("🚀 Generate Report", use_container_width=True):
         if not property_address.strip():
@@ -907,7 +907,7 @@ with tab1:
 # --------------------------------------------------------------
 with tab2:
     st.markdown("### 📜 View Saved Reports")
-    search_address = st.text_input("🏠 Search by Address:")
+    search_address = st.text_input("🏠 Search by Address ( Eg:2850 S Arlington Rd, Akron, OH 44312 ) ")
     if st.button("🔍 Retrieve Report", use_container_width=True):
         doc = collection.find_one({"address": search_address})
         if doc:
@@ -916,3 +916,4 @@ with tab2:
             st.dataframe(df_past, use_container_width=True)
         else:
             st.error("❌ No records found for this address.")
+
